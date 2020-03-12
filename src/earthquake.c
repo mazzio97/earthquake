@@ -156,8 +156,8 @@ void propagate_energy( float *cur, float *next, int n )
             /* Si noti che il valore di F potrebbe essere ancora
                maggiore di EMAX; questo non e' un problema:
                l'eventuale eccesso verra' rilasciato al termine delle
-               successive iterazioni vino a riportare il valore
-               dell'energia sotto la foglia EMAX. */
+               successive iterazioni fino a riportare il valore
+               dell'energia sotto la soglia EMAX. */
             *out = F;
         }
     }
@@ -200,6 +200,16 @@ int main( int argc, char* argv[] )
         n = atoi(argv[2]);
     }
 
+    /* Parametri in input non validi */
+    if ( nsteps <= 0 || n <= 0 ) {
+        /* Se non vengono effettuate computazioni 
+           il tempo di esecuzione è considerato nullo */
+    #ifdef BENCHMARK
+	    printf("0\n");
+    #endif
+        return EXIT_FAILURE;
+    }
+
     const size_t size = n*n*sizeof(float);
 
     /* Allochiamo i domini */
@@ -209,16 +219,19 @@ int main( int argc, char* argv[] )
     /* L'energia iniziale di ciascuna cella e' scelta 
        con probabilita' uniforme nell'intervallo [0, EMAX*0.1] */       
     setup(cur, n, 0, EMAX*0.1);
-    
+
     const double tstart = hpc_gettime();
     for (s=0; s<nsteps; s++) {
         /* L'ordine delle istruzioni che seguono e' importante */
         increment_energy(cur, n, EDELTA);
+        
         c = count_cells(cur, n);
         propagate_energy(cur, next, n);
         Emean = average_energy(next, n);
 
+#ifndef BENCHMARK
         printf("%d %f\n", c, Emean);
+#endif
 
         float *tmp = cur;
         cur = next;
@@ -226,8 +239,12 @@ int main( int argc, char* argv[] )
     }
     const double elapsed = hpc_gettime() - tstart;
     
+#ifndef BENCHMARK
     double Mupdates = (((double)n)*n/1.0e6)*nsteps; /* milioni di celle aggiornate per ogni secondo di wall clock time */
     fprintf(stderr, "%s : %.4f Mupdates in %.4f seconds (%f Mupd/sec)\n", argv[0], Mupdates, elapsed, Mupdates/elapsed);
+#else
+    printf("%.4f\n", elapsed);
+#endif
 
     /* Libera la memoria */
     free(cur);

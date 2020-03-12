@@ -1,57 +1,45 @@
-## Makefile di esempio per il progetto di High Performance Computing
-## 2018/2019, corso di laurea in Ingegneria e Scienze Informatiche,
-## Universita' di Bologna sede di Cesena.
+## Diego Mazzieri 0000792583
 
-## Ultima modifica: 2018-12-15, Moreno Marzolla <moreno.marzolla(at)unibo.it>
-
-## Questo e' un frammento del Makefile utilizzato negli esempi
-## illustrati durante il corso. Questo file puo' essere modificato e
-## personalizzato in base alle proprie esigenze. Si puo' anche
-## decidere di non usarlo; in tal caso indicare le istruzioni di
-## compilazione nel file README presente nella directory a livello
-## superiore.
+## Questo Makefile fornisce i seguenti target:
 ##
-## Questo Makefile compila i file "omp-*.c" usando il flag -fopenmp, i
-## file "cuda-*.cu" con il compilatore nvcc, e i file "mpi-*.c" con
-## mpicc.
-##
-## Questo makefile fornisce i seguenti target:
-##
-## make         compila tutti i sorgenti disponibili
-## make clean   cancella i file temporanei e gli eseguibili
-## make openmp  compila la versione OpenMP
-## make mpi     compila la versione MPI
-## make cuda    compila la versione CUDA
-## make plot    produce il grafico di esempio usando la versione seriale
+## make            compila tutti i sorgenti disponibili
+## make clean      cancella i file temporanei e gli eseguibili
+## make serial     compila la versione seriale
+## make openmp     compila la versione OpenMP
+## make cuda       compila la versione CUDA
+## make benchmark  compila tutti i sorgenti in versione benchmark
 
 EXE_OMP:=$(basename $(wildcard omp-*.c))
-EXE_MPI:=$(basename $(wildcard mpi-*.c))
 EXE_CUDA:=$(basename $(wildcard cuda-*.cu))
 EXE_SERIAL:=earthquake
-EXE:=$(EXE_OMP) $(EXE_MPI) $(EXE_SERIAL) $(EXE_CUDA)
+EXE:=$(EXE_OMP) $(EXE_SERIAL) $(EXE_CUDA)
 CFLAGS+=-std=c99 -Wall -Wpedantic -O2 -D_XOPEN_SOURCE=600
+OMPFLAGS:=-fopenmp
+OMPLIBS:=-lgomp
+BENCHFLAGS:=-Wno-unused-but-set-variable
+BENCHMACRO:=-DBENCHMARK
 NVCC:=nvcc
 NVCFLAGS+=-Wno-deprecated-gpu-targets
 
-.PHONY: clean plot
+.PHONY: clean benchmark
 
 ALL: $(EXE)
 
 % : %.cu
 	$(NVCC) $(NVCFLAGS) $< -o $@
 
-$(EXE_OMP): CFLAGS+=-fopenmp
-$(EXE_OMP): LDLIBS+=-lgomp
-openmp: $(EXE_OMP)
+serial: $(EXE_SERIAL)
 
-$(EXE_MPI): CC=mpicc
-mpi: $(EXE_MPI)
+$(EXE_OMP): CFLAGS+=$(OMPFLAGS)
+$(EXE_OMP): LDLIBS+=$(OMPLIBS)
+openmp: $(EXE_OMP)
 
 cuda: $(EXE_CUDA)
 
-plot: $(EXE_SERIAL)
-	./$(EXE_SERIAL) 100000 256 > out
-	gnuplot plot.gp
+benchmark:
+	cc $(CFLAGS) $(BENCHFLAGS) $(BENCHMACRO) $(EXE_SERIAL).c -o $(EXE_SERIAL)
+	cc $(CFLAGS) $(OMPFLAGS) $(BENCHFLAGS) $(BENCHMACRO) $(OMPLIBS) $(EXE_OMP).c -o $(EXE_OMP)
+	$(NVCC) $(NVCFLAGS) $(BENCHMACRO) $(EXE_CUDA).cu -o $(EXE_CUDA)
 
 clean:
 	\rm -f $(EXE) *.o *~ *.png out
